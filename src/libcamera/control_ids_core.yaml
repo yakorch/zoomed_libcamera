@@ -872,4 +872,9 @@ controls:
         sRGB gamma. Note that this is camera gamma, so it is applied as 
         1.0/gamma.
 
+  - ZoomLabel:
+      type: float
+      description: |
+        The current zoom level of the camera.
+
 ...

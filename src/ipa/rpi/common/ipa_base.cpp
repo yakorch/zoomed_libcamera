@@ -71,6 +71,7 @@ const ControlInfoMap::Map ipaControls{
 	{ &controls::HdrMode, ControlInfo(controls::HdrModeValues) },
 	{ &controls::Sharpness, ControlInfo(0.0f, 16.0f, 1.0f) },
 	{ &controls::ScalerCrop, ControlInfo(Rectangle{}, Rectangle(65535, 65535, 65535, 65535), Rectangle{}) },
+	{ &controls::ZoomLabel, ControlInfo(0.0f, 100.0f, 1.0f) },
 	{ &controls::FrameDurationLimits, ControlInfo(INT64_C(33333), INT64_C(120000)) },
 	{ &controls::draft::NoiseReductionMode, ControlInfo(controls::draft::NoiseReductionModeValues) },
 	{ &controls::rpi::StatsOutputEnable, ControlInfo(false, true, false) },
@@ -1245,6 +1246,11 @@ void IpaBase::applyControls(const ControlList &controls)
 
 		case controls::rpi::STATS_OUTPUT_ENABLE:
 			statsMetadataOutput_ = ctrl.second.get<bool>();
+			break;
+
+		case controls::ZOOM_LABEL:
+			// TODO: either change the log level to Debug, or remove this logging completely.
+			LOG(IPARPI, Info) << "Zoom label received: " << ctrl.second.get<float>();
 			break;
 
 		default:
