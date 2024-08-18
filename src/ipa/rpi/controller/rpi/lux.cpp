@@ -21,7 +21,7 @@ LOG_DEFINE_CATEGORY(RPiLux)
 #define NAME "rpi.lux"
 
 Lux::Lux(Controller *controller)
-	: Algorithm(controller)
+	: LuxAlgorithm(controller)
 {
 	/*
 	 * Put in some defaults as there will be no meaningful values until
@@ -67,6 +67,11 @@ int Lux::read(const libcamera::YamlObject &params)
 void Lux::setCurrentAperture(double aperture)
 {
 	currentAperture_ = aperture;
+}
+
+void Lux::setCurrentZoomLabel(double zoomLabel)
+{
+	currentZoomLabel_ = zoomLabel;
 }
 
 void Lux::prepare(Metadata *imageMetadata)

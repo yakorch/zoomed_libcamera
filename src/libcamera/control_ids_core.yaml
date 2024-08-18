@@ -877,4 +877,8 @@ controls:
       description: |
         The current zoom level of the camera.
 
+  - Aperture:
+      type: float
+      description: |
+        The current aperture of the camera.
 ...

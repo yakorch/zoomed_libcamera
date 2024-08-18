@@ -11,13 +11,13 @@
 #include <libcamera/base/utils.h>
 
 #include "../lux_status.h"
-#include "../algorithm.h"
+#include "../lux_algorithm.h"
 
 /* This is our implementation of the "lux control algorithm". */
 
 namespace RPiController {
 
-class Lux : public Algorithm
+class Lux : public LuxAlgorithm
 {
 public:
 	Lux(Controller *controller);
@@ -26,6 +26,7 @@ public:
 	void prepare(Metadata *imageMetadata) override;
 	void process(StatisticsPtr &stats, Metadata *imageMetadata) override;
 	void setCurrentAperture(double aperture);
+	void setCurrentZoomLabel(double zoomLabel);
 
 private:
 	/*
@@ -38,6 +39,8 @@ private:
 	double referenceY_; /* out of 65536 */
 	double referenceLux_;
 	double currentAperture_;
+	double referenceZoomLabel_;
+	double currentZoomLabel_;
 	LuxStatus status_;
 	std::mutex mutex_;
 };

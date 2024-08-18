@@ -25,6 +25,7 @@
 #include "controller/contrast_algorithm.h"
 #include "controller/denoise_algorithm.h"
 #include "controller/hdr_algorithm.h"
+#include "controller/lux_algorithm.h"
 #include "controller/lux_status.h"
 #include "controller/sharpen_algorithm.h"
 #include "controller/statistics.h"
@@ -71,7 +72,8 @@ const ControlInfoMap::Map ipaControls{
 	{ &controls::HdrMode, ControlInfo(controls::HdrModeValues) },
 	{ &controls::Sharpness, ControlInfo(0.0f, 16.0f, 1.0f) },
 	{ &controls::ScalerCrop, ControlInfo(Rectangle{}, Rectangle(65535, 65535, 65535, 65535), Rectangle{}) },
-	{ &controls::ZoomLabel, ControlInfo(0.0f, 100.0f, 1.0f) },
+	{ &controls::ZoomLabel, ControlInfo(0.0f, 1000.0f, 1.0f) },
+	{ &controls::Aperture, ControlInfo(0.0f, 1.0f, 1.0f) },
 	{ &controls::FrameDurationLimits, ControlInfo(INT64_C(33333), INT64_C(120000)) },
 	{ &controls::draft::NoiseReductionMode, ControlInfo(controls::draft::NoiseReductionModeValues) },
 	{ &controls::rpi::StatsOutputEnable, ControlInfo(false, true, false) },
@@ -722,6 +724,7 @@ void IpaBase::applyControls(const ControlList &controls)
 	using RPiController::ContrastAlgorithm;
 	using RPiController::DenoiseAlgorithm;
 	using RPiController::HdrAlgorithm;
+	using RPiController::LuxAlgorithm;
 
 	/* Clear the return metadata buffer. */
 	libcameraMetadata_.clear();
@@ -1248,10 +1251,35 @@ void IpaBase::applyControls(const ControlList &controls)
 			statsMetadataOutput_ = ctrl.second.get<bool>();
 			break;
 
-		case controls::ZOOM_LABEL:
+		case controls::ZOOM_LABEL: {
+			auto zoomLabel = static_cast<double>(ctrl.second.get<float>());
 			// TODO: either change the log level to Debug, or remove this logging completely.
-			LOG(IPARPI, Info) << "Zoom label received: " << ctrl.second.get<float>();
+			LOG(IPARPI, Info) << "Zoom label received: " << zoomLabel;
+			libcameraMetadata_.set(controls::ZoomLabel, zoomLabel);
+
+			LuxAlgorithm *lux = dynamic_cast<LuxAlgorithm *>(controller_.getAlgorithm("lux"));
+			if (!lux) {
+				LOG(IPARPI, Warning) << "Zoom label setting requires a Lux algorithm.";
+				break;
+			}
+			lux->setCurrentZoomLabel(zoomLabel);
 			break;
+		}
+
+		case controls::APERTURE: {
+			auto aperture = static_cast<double>(ctrl.second.get<float>());
+			// TODO: either change the log level to Debug, or remove this logging completely.
+			LOG(IPARPI, Info) << "Aperture received: " << aperture;
+			libcameraMetadata_.set(controls::Aperture, aperture);
+
+			LuxAlgorithm *lux = dynamic_cast<LuxAlgorithm *>(controller_.getAlgorithm("lux"));
+			if (!lux) {
+				LOG(IPARPI, Warning) << "Aperture setting requires a Lux algorithm.";
+				break;
+			}
+			lux->setCurrentAperture(aperture);
+			break;
+		}
 
 		default:
 			LOG(IPARPI, Warning)
