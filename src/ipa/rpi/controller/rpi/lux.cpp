@@ -64,15 +64,6 @@ int Lux::read(const libcamera::YamlObject &params)
 	return 0;
 }
 
-void Lux::setCurrentAperture(double aperture)
-{
-	currentAperture_ = aperture;
-}
-
-void Lux::setCurrentZoomLabel(double zoomLabel)
-{
-	currentZoomLabel_ = zoomLabel;
-}
 
 void Lux::prepare(Metadata *imageMetadata)
 {

@@ -25,9 +25,6 @@ public:
 	int read(const libcamera::YamlObject &params) override;
 	void prepare(Metadata *imageMetadata) override;
 	void process(StatisticsPtr &stats, Metadata *imageMetadata) override;
-	void setCurrentAperture(double aperture);
-	void setCurrentZoomLabel(double zoomLabel);
-
 private:
 	/*
 	 * These values define the conditions of the reference image, against
@@ -38,9 +35,7 @@ private:
 	double referenceAperture_; /* units of 1/f */
 	double referenceY_; /* out of 65536 */
 	double referenceLux_;
-	double currentAperture_;
 	double referenceZoomLabel_;
-	double currentZoomLabel_;
 	LuxStatus status_;
 	std::mutex mutex_;
 };

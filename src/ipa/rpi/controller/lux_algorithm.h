@@ -14,9 +14,12 @@ class LuxAlgorithm : public Algorithm
 {
 public:
 	LuxAlgorithm(Controller *controller) : Algorithm(controller) {}
-	/* A Lux algorithm must provide the following: */
-	virtual void setCurrentAperture(double aperture) = 0;
-	virtual void setCurrentZoomLabel(double zoomLabel) = 0;
+	void setCurrentAperture(double aperture) { currentAperture_ = aperture; };
+	void setCurrentZoomLabel(double zoomLabel) { currentZoomLabel_ = zoomLabel; };
+
+protected:
+	double currentAperture_;
+	double currentZoomLabel_;
 };
 
 } /* namespace RPiController */
