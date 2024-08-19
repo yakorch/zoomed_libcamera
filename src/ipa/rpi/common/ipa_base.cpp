@@ -1252,9 +1252,17 @@ void IpaBase::applyControls(const ControlList &controls)
 			break;
 
 		case controls::ZOOM_LABEL: {
-			auto zoomLabel = static_cast<double>(ctrl.second.get<float>());
-			// TODO: either change the log level to Debug, or remove this logging completely.
-			LOG(IPARPI, Info) << "Zoom label received: " << zoomLabel;
+			auto zoomLabel = ctrl.second.get<float>();
+			const ControlInfo &zoomLabelControlInfo = ipaControls.at(controls::ZoomLabel);
+
+			if (zoomLabel <= zoomLabelControlInfo.min().get<float>()) {
+				LOG(IPARPI, Error) << "Zoom label out of range (too small). Skipping the setting.";
+				break;
+			}
+			if (zoomLabel > zoomLabelControlInfo.max().get<float>()) {
+				LOG(IPARPI, Warning) << "Zoom label out of range (too large). Continuing anyways.";
+			}
+
 			libcameraMetadata_.set(controls::ZoomLabel, zoomLabel);
 
 			LuxAlgorithm *lux = dynamic_cast<LuxAlgorithm *>(controller_.getAlgorithm("lux"));
@@ -1262,22 +1270,27 @@ void IpaBase::applyControls(const ControlList &controls)
 				LOG(IPARPI, Warning) << "Zoom label setting requires a Lux algorithm.";
 				break;
 			}
-			lux->setCurrentZoomLabel(zoomLabel);
+			lux->setCurrentZoomLabel(static_cast<double>(zoomLabel));
 			break;
 		}
 
 		case controls::APERTURE: {
-			auto aperture = static_cast<double>(ctrl.second.get<float>());
-			// TODO: either change the log level to Debug, or remove this logging completely.
-			LOG(IPARPI, Info) << "Aperture received: " << aperture;
+			auto aperture = ctrl.second.get<float>();
+			
+			const ControlInfo &apertureControlInfo = ipaControls.at(controls::Aperture);
+			if (aperture <= apertureControlInfo.min().get<float>() || aperture > apertureControlInfo.max().get<float>()) {
+				LOG(IPARPI, Error) << "Aperture out of range. Skipping the setting.";
+				break;
+			}
+
 			libcameraMetadata_.set(controls::Aperture, aperture);
 
 			LuxAlgorithm *lux = dynamic_cast<LuxAlgorithm *>(controller_.getAlgorithm("lux"));
 			if (!lux) {
-				LOG(IPARPI, Warning) << "Aperture setting requires a Lux algorithm.";
+				LOG(IPARPI, Error) << "Aperture setting requires a Lux algorithm.";
 				break;
 			}
-			lux->setCurrentAperture(aperture);
+			lux->setCurrentAperture(static_cast<double>(aperture));
 			break;
 		}
 
