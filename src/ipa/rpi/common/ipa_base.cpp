@@ -1253,7 +1253,7 @@ void IpaBase::applyControls(const ControlList &controls)
 
 		case controls::ZOOM_LABEL: {
 			auto zoomLabel = ctrl.second.get<float>();
-			const ControlInfo &zoomLabelControlInfo = ipaControls.at(controls::ZoomLabel);
+			const ControlInfo &zoomLabelControlInfo = ipaControls.at(&controls::ZoomLabel);
 
 			if (zoomLabel <= zoomLabelControlInfo.min().get<float>()) {
 				LOG(IPARPI, Error) << "Zoom label out of range (too small). Skipping the setting.";
@@ -1277,7 +1277,7 @@ void IpaBase::applyControls(const ControlList &controls)
 		case controls::APERTURE: {
 			auto aperture = ctrl.second.get<float>();
 			
-			const ControlInfo &apertureControlInfo = ipaControls.at(controls::Aperture);
+			const ControlInfo &apertureControlInfo = ipaControls.at(&controls::Aperture);
 			if (aperture <= apertureControlInfo.min().get<float>() || aperture > apertureControlInfo.max().get<float>()) {
 				LOG(IPARPI, Error) << "Aperture out of range. Skipping the setting.";
 				break;
