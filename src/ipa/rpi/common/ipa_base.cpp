@@ -1263,8 +1263,6 @@ void IpaBase::applyControls(const ControlList &controls)
 				LOG(IPARPI, Warning) << "Zoom label out of range (too large). Continuing anyways.";
 			}
 
-			libcameraMetadata_.set(controls::ZoomLabel, zoomLabel);
-
 			LuxAlgorithm *lux = dynamic_cast<LuxAlgorithm *>(controller_.getAlgorithm("lux"));
 			if (!lux) {
 				LOG(IPARPI, Warning) << "Zoom label setting requires a Lux algorithm.";
@@ -1282,8 +1280,6 @@ void IpaBase::applyControls(const ControlList &controls)
 				LOG(IPARPI, Error) << "Aperture out of range. Skipping the setting.";
 				break;
 			}
-
-			libcameraMetadata_.set(controls::Aperture, aperture);
 
 			LuxAlgorithm *lux = dynamic_cast<LuxAlgorithm *>(controller_.getAlgorithm("lux"));
 			if (!lux) {
@@ -1360,8 +1356,9 @@ void IpaBase::reportMetadata(unsigned int ipaContext)
 	}
 
 	LuxStatus *luxStatus = rpiMetadata.getLocked<LuxStatus>("lux.status");
-	if (luxStatus)
+	if (luxStatus) {
 		libcameraMetadata_.set(controls::Lux, luxStatus->lux);
+	}
 
 	AwbStatus *awbStatus = rpiMetadata.getLocked<AwbStatus>("awb.status");
 	if (awbStatus) {

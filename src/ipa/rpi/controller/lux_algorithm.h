@@ -6,20 +6,14 @@
  */
 #pragma once
 
-#include "algorithm.h"
+#include "lens_aware_algorithm.h"
 
 namespace RPiController {
 
-class LuxAlgorithm : public Algorithm
+class LuxAlgorithm : public LensAwareAlgorithm
 {
 public:
-	LuxAlgorithm(Controller *controller) : Algorithm(controller) {}
-	void setCurrentAperture(double aperture) { currentAperture_ = aperture; };
-	void setCurrentZoomLabel(double zoomLabel) { currentZoomLabel_ = zoomLabel; };
-
-protected:
-	double currentAperture_;
-	double currentZoomLabel_;
+	LuxAlgorithm(Controller *controller) : LensAwareAlgorithm(controller) {}
 };
 
 } /* namespace RPiController */

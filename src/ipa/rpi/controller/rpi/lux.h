@@ -25,6 +25,8 @@ public:
 	int read(const libcamera::YamlObject &params) override;
 	void prepare(Metadata *imageMetadata) override;
 	void process(StatisticsPtr &stats, Metadata *imageMetadata) override;
+	void setCurrentAperture(double aperture) override;
+	void setCurrentZoomLabel(double zoomLabel) override;
 private:
 	/*
 	 * These values define the conditions of the reference image, against
