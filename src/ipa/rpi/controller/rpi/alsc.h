@@ -14,13 +14,13 @@
 
 #include <libcamera/geometry.h>
 
-#include "../algorithm.h"
+#include "../alsc_algorithm.h"
 #include "../alsc_status.h"
 #include "../statistics.h"
 
 namespace RPiController {
 
-/* Algorithm to generate automagic LSC (Lens Shading Correction) tables. */
+/* Algorithm to generate automatic LSC (Lens Shading Correction) tables. */
 
 /*
  * The Array2D class is a very thin wrapper round std::vector so that it can
@@ -104,7 +104,7 @@ struct AlscConfig {
 	libcamera::Size tableSize;
 };
 
-class Alsc : public Algorithm
+class Alsc : public AlscAlgorithm
 {
 public:
 	Alsc(Controller *controller = NULL);
@@ -115,12 +115,17 @@ public:
 	int read(const libcamera::YamlObject &params) override;
 	void prepare(Metadata *imageMetadata) override;
 	void process(StatisticsPtr &stats, Metadata *imageMetadata) override;
+	
+	void setZoomLabel(double zoomLabel) override;
+	// TODO: implememt the function below.
+	void setAperture(double aperture) override {};
 
 private:
 	/* configuration is read-only, and available to both threads */
 	AlscConfig config_;
 	bool firstTime_;
 	CameraMode cameraMode_;
+	/* is kept up-to-date given the lens parameters and the camera mode */
 	Array2D<double> luminanceTable_;
 	std::thread asyncThread_;
 	void asyncFunc(); /* asynchronous thread function */
@@ -147,9 +152,16 @@ private:
 	int frameCount_;
 	/* counts up to startupFrames for Process function */
 	int frameCount2_;
+	/* up-to-date zoom label */
+	double zoomLabel_;
+	/*
+	 * Tells if the new lens properties significantly 
+	 * differ from the ones used for previous computation
+	*/
+	inline bool lens_restart_required();
 	std::array<Array2D<double>, 3> syncResults_;
 	std::array<Array2D<double>, 3> prevSyncResults_;
-	void waitForAysncThread();
+	void waitForAsyncThread();
 	/*
 	 * The following are for the asynchronous thread to use, though the main
 	 * thread can set/reset them if the async thread is known to be idle:
@@ -158,6 +170,15 @@ private:
 	/* copy out the results from the async thread so that it can be restarted */
 	void fetchAsyncResults();
 	double ct_;
+	/* the zoom label to be used for future computation */
+	double asyncZoomLabel_;
+	/* the zoom label for which the last computation of `lensAwareLuminanceTable_` was performed */
+	double lastZoomLabel_;
+	/* Computes cameraMode-unaware calibration table */
+	void computeLensAwareLuminanceTable();
+	Array2D<double> lensAwareLuminanceTable_;
+	/* Modifies `luminanceTable_` given the camera mode and the lens parameters */
+	void computeLuminanceTable();
 	RgbyRegions statistics_;
 	std::array<Array2D<double>, 3> asyncResults_;
 	Array2D<double> asyncLambdaR_;

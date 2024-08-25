@@ -29,7 +29,7 @@ LOG_DEFINE_CATEGORY(RPiAlsc)
 static const double InsufficientData = -1.0;
 
 Alsc::Alsc(Controller *controller)
-	: Algorithm(controller)
+	: AlscAlgorithm(controller)
 {
 	asyncAbort_ = asyncStart_ = asyncStarted_ = asyncFinished_ = false;
 	asyncThread_ = std::thread(std::bind(&Alsc::asyncFunc, this));
@@ -208,6 +208,9 @@ void Alsc::initialise()
 	frameCount2_ = frameCount_ = framePhase_ = 0;
 	firstTime_ = true;
 	ct_ = config_.defaultCt;
+	zoomLabel_ = asyncZoomLabel_ = 1.0;
+	/* To force a computation of the luminance table in the async thread. */
+	lastZoomLabel_ = -1.0;
 
 	const size_t XY = config_.tableSize.width * config_.tableSize.height;
 
@@ -219,6 +222,7 @@ void Alsc::initialise()
 		r.resize(config_.tableSize);
 
 	luminanceTable_.resize(config_.tableSize);
+	lensAwareLuminanceTable_.resize(config_.tableSize);
 	asyncLambdaR_.resize(config_.tableSize);
 	asyncLambdaB_.resize(config_.tableSize);
 	/* The lambdas are initialised in the SwitchMode. */
@@ -232,7 +236,11 @@ void Alsc::initialise()
 		m.resize(XY);
 }
 
-void Alsc::waitForAysncThread()
+void Alsc::setZoomLabel(double zoomLabel) {
+	zoomLabel_ = zoomLabel;
+}
+
+void Alsc::waitForAsyncThread()
 {
 	if (asyncStarted_) {
 		asyncStarted_ = false;
@@ -269,6 +277,17 @@ static bool compareModes(CameraMode const &cm0, CameraMode const &cm1)
 	       topDiff > thresholdY || bottomDiff > thresholdY;
 }
 
+void Alsc::computeLensAwareLuminanceTable() {
+	// TODO: implement
+}
+
+void Alsc::computeLuminanceTable() {
+	computeLensAwareLuminanceTable();
+	lastZoomLabel_ = asyncZoomLabel_;
+
+	resampleCalTable(lensAwareLuminanceTable_, cameraMode_, luminanceTable_);
+}
+
 void Alsc::switchMode(CameraMode const &cameraMode,
 		      [[maybe_unused]] Metadata *metadata)
 {
@@ -282,15 +301,12 @@ void Alsc::switchMode(CameraMode const &cameraMode,
 	ct_ = getCt(metadata, ct_);
 
 	/* Ensure the other thread isn't running while we do this. */
-	waitForAysncThread();
-
+	waitForAsyncThread();
 	cameraMode_ = cameraMode;
 
-	/*
-	 * We must resample the luminance table like we do the others, but it's
-	 * fixed so we can simply do it up front here.
-	 */
-	resampleCalTable(config_.luminanceLut, cameraMode_, luminanceTable_);
+	
+	asyncZoomLabel_ = zoomLabel_;
+	computeLuminanceTable();
 
 	if (resetTables) {
 		/*
@@ -373,6 +389,7 @@ void Alsc::restartAsync(StatisticsPtr &stats, Metadata *imageMetadata)
 	 */
 	copyStats(statistics_, stats, prevSyncResults_);
 	framePhase_ = 0;
+	asyncZoomLabel_ = zoomLabel_;
 	asyncStarted_ = true;
 	{
 		std::lock_guard<std::mutex> lock(mutex_);
@@ -417,6 +434,11 @@ void Alsc::prepare(Metadata *imageMetadata)
 	getGlobalMetadata().set("alsc.status", status);
 }
 
+inline bool Alsc::lens_restart_required() {
+	// TODO: refactor.
+	return std::abs(zoomLabel_ - asyncZoomLabel_) > 1e-1;
+}
+
 void Alsc::process(StatisticsPtr &stats, Metadata *imageMetadata)
 {
 	/*
@@ -428,10 +450,13 @@ void Alsc::process(StatisticsPtr &stats, Metadata *imageMetadata)
 	if (frameCount2_ < (int)config_.startupFrames)
 		frameCount2_++;
 	LOG(RPiAlsc, Debug) << "frame_phase " << framePhase_;
-	if (framePhase_ >= (int)config_.framePeriod ||
-	    frameCount2_ < (int)config_.startupFrames) {
-		if (asyncStarted_ == false)
-			restartAsync(stats, imageMetadata);
+
+	const bool scheduled_restart = framePhase_ >= (int)config_.framePeriod;
+	const bool startup_restart = frameCount2_ < (int)config_.startupFrames;
+	const bool restart_required = scheduled_restart || startup_restart || lens_restart_required();
+
+	if (!asyncStarted_ && restart_required) {
+		restartAsync(stats, imageMetadata);
 	}
 }
 
@@ -815,6 +840,10 @@ void addLuminanceToTables(std::array<Array2D<double>, 3> &results,
 
 void Alsc::doAlsc()
 {
+	if (lastZoomLabel_ != asyncZoomLabel_) {
+		computeLuminanceTable();
+	}
+
 	Array2D<double> &cr = tmpC_[0], &cb = tmpC_[1], &calTableR = tmpC_[2],
 			&calTableB = tmpC_[3], &calTableTmp = tmpC_[4];
 	SparseArray<double> &wr = tmpM_[0], &wb = tmpM_[1], &M = tmpM_[2];

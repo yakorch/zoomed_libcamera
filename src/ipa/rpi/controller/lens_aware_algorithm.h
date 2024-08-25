@@ -14,12 +14,8 @@ class LensAwareAlgorithm : public Algorithm
 {
 public:
 	LensAwareAlgorithm(Controller *controller) : Algorithm(controller) {}
-    virtual void setCurrentAperture(double aperture) = 0;
-    virtual void setCurrentZoomLabel(double zoomLabel) = 0;
-
-protected:
-	double currentAperture_;
-	double currentZoomLabel_;
+    virtual void setAperture(double aperture) = 0;
+    virtual void setZoomLabel(double zoomLabel) = 0;
 };
 
 } /* namespace RPiController */
