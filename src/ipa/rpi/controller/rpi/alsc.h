@@ -95,6 +95,7 @@ struct AlscConfig {
 	double omega;
 	uint32_t nIter;
 	Array2D<double> luminanceLut;
+	std::vector<std::pair<double, Array2D<double>>> luminanceLUTables;
 	double luminanceStrength;
 	std::vector<AlscCalibration> calibrationsCr;
 	std::vector<AlscCalibration> calibrationsCb;
@@ -171,11 +172,11 @@ private:
 	void fetchAsyncResults();
 	double ct_;
 	/* the zoom label to be used for future computation */
-	double asyncZoomLabel_;
+	double syncedZoomLabel_;
 	/* the zoom label for which the last computation of `lensAwareLuminanceTable_` was performed */
-	double lastZoomLabel_;
+	double cachedZoomLabel_;
 	/* Computes cameraMode-unaware calibration table */
-	void computeLensAwareLuminanceTable();
+	void computeLensAwareLuminanceTable(double zoomLabel);
 	Array2D<double> lensAwareLuminanceTable_;
 	/* Modifies `luminanceTable_` given the camera mode and the lens parameters */
 	void computeLuminanceTable();

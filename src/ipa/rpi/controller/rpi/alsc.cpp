@@ -161,13 +161,38 @@ int Alsc::read(const libcamera::YamlObject &params)
 		params["luminance_strength"].get<double>(1.0);
 
 	config_.luminanceLut.resize(config_.tableSize, 1.0);
-	int ret = 0;
 
+	const auto luminanceTableParamsProvided = params.contains("corner_strength") + params.contains("luminance_lut") + params.contains("luminance_lu_tables");
+	if (luminanceTableParamsProvided > 1) {
+		LOG(RPiAlsc, Warning) << "Number of luminance table parameters exceeds `1`.";
+	}
+
+	int ret = 0;
 	if (params.contains("corner_strength"))
 		ret = generateLut(config_.luminanceLut, params);
 	else if (params.contains("luminance_lut"))
 		ret = readLut(config_.luminanceLut, params["luminance_lut"]);
-	else
+	else if (params.contains("luminance_lu_tables")) {
+		for (const auto &p : params["luminance_lu_tables"].asList()) {
+			auto zoomLabel = p["zoom_label"].get<double>();
+			Array2D<double> luminanceTable;
+			luminanceTable.resize(config_.tableSize);
+			ret = readLut(luminanceTable, p["luminance_lut"]);
+			if (ret) { return ret; }
+			config_.luminanceLUTables.emplace_back((zoomLabel, luminanceTable));
+		}
+
+		if (config_.luminanceLUTables.size() == 0) {
+			LOG(RPiAlsc, Error)
+			<< "No luminance tables provided.";
+			return -EINVAL;
+		}
+		if (config_.luminanceLUTables.size() == 1) {
+			LOG(RPiAlsc, Warning)
+			<< "Only `1` luminance table provided.";
+		}
+	}
+	else 
 		LOG(RPiAlsc, Warning)
 			<< "no luminance table - assume unity everywhere";
 	if (ret)
@@ -208,9 +233,9 @@ void Alsc::initialise()
 	frameCount2_ = frameCount_ = framePhase_ = 0;
 	firstTime_ = true;
 	ct_ = config_.defaultCt;
-	zoomLabel_ = asyncZoomLabel_ = 1.0;
+	zoomLabel_ = syncedZoomLabel_ = 1.0;
 	/* To force a computation of the luminance table in the async thread. */
-	lastZoomLabel_ = -1.0;
+	cachedZoomLabel_ = -1.0;
 
 	const size_t XY = config_.tableSize.width * config_.tableSize.height;
 
@@ -277,14 +302,37 @@ static bool compareModes(CameraMode const &cm0, CameraMode const &cm1)
 	       topDiff > thresholdY || bottomDiff > thresholdY;
 }
 
-void Alsc::computeLensAwareLuminanceTable() {
-	// TODO: implement
+void Alsc::computeLensAwareLuminanceTable(double requestedZoomLabel) {
+
+	auto lowestZoomLabel = config_.luminanceLUTables.front().first;
+	auto largestZoomLabel = config_.luminanceLUTables.back().first;
+	requestedZoomLabel = std::min(std::max(lowestZoomLabel, requestedZoomLabel), largestZoomLabel);
+
+	int ind = -1;
+	for (const auto &[zoomLabel, luminanceTable] : config_.luminanceLUTables) {
+		if (requestedZoomLabel == zoomLabel) {
+			lensAwareLuminanceTable_ = luminanceTable;
+			return;
+		}
+
+		ind++;
+		if (requestedZoomLabel > zoomLabel) { continue; }
+
+		const auto &[previousZoomLabel, previousLuminanceTable] = config_.luminanceLUTables[ind];
+		auto previousScale = (requestedZoomLabel - previousZoomLabel) / (zoomLabel - previousZoomLabel);
+		auto nextScale = 1 - previousScale;
+		for (size_t i = 0; i < luminanceTable.size(); i++) {
+			lensAwareLuminanceTable_[i] = previousScale * previousLuminanceTable[i] + nextScale * luminanceTable[i];
+		}
+		return;
+	}
 }
 
 void Alsc::computeLuminanceTable() {
-	computeLensAwareLuminanceTable();
-	lastZoomLabel_ = asyncZoomLabel_;
-
+	if (cachedZoomLabel_ != syncedZoomLabel_) {
+		computeLensAwareLuminanceTable(syncedZoomLabel_);
+		cachedZoomLabel_ = syncedZoomLabel_;
+	}
 	resampleCalTable(lensAwareLuminanceTable_, cameraMode_, luminanceTable_);
 }
 
@@ -303,9 +351,8 @@ void Alsc::switchMode(CameraMode const &cameraMode,
 	/* Ensure the other thread isn't running while we do this. */
 	waitForAsyncThread();
 	cameraMode_ = cameraMode;
-
 	
-	asyncZoomLabel_ = zoomLabel_;
+	syncedZoomLabel_ = zoomLabel_;
 	computeLuminanceTable();
 
 	if (resetTables) {
@@ -389,7 +436,7 @@ void Alsc::restartAsync(StatisticsPtr &stats, Metadata *imageMetadata)
 	 */
 	copyStats(statistics_, stats, prevSyncResults_);
 	framePhase_ = 0;
-	asyncZoomLabel_ = zoomLabel_;
+	syncedZoomLabel_ = zoomLabel_;
 	asyncStarted_ = true;
 	{
 		std::lock_guard<std::mutex> lock(mutex_);
@@ -436,7 +483,7 @@ void Alsc::prepare(Metadata *imageMetadata)
 
 inline bool Alsc::lens_restart_required() {
 	// TODO: refactor.
-	return std::abs(zoomLabel_ - asyncZoomLabel_) > 1e-1;
+	return std::abs(zoomLabel_ - syncedZoomLabel_) > 1e-1;
 }
 
 void Alsc::process(StatisticsPtr &stats, Metadata *imageMetadata)
@@ -451,11 +498,14 @@ void Alsc::process(StatisticsPtr &stats, Metadata *imageMetadata)
 		frameCount2_++;
 	LOG(RPiAlsc, Debug) << "frame_phase " << framePhase_;
 
+	if (asyncStarted_) {
+		return;
+	}
 	const bool scheduled_restart = framePhase_ >= (int)config_.framePeriod;
 	const bool startup_restart = frameCount2_ < (int)config_.startupFrames;
 	const bool restart_required = scheduled_restart || startup_restart || lens_restart_required();
 
-	if (!asyncStarted_ && restart_required) {
+	if (restart_required) {
 		restartAsync(stats, imageMetadata);
 	}
 }
@@ -840,7 +890,7 @@ void addLuminanceToTables(std::array<Array2D<double>, 3> &results,
 
 void Alsc::doAlsc()
 {
-	if (lastZoomLabel_ != asyncZoomLabel_) {
+	if (cachedZoomLabel_ != syncedZoomLabel_) {
 		computeLuminanceTable();
 	}
 
