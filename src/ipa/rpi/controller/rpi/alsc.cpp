@@ -179,17 +179,20 @@ int Alsc::read(const libcamera::YamlObject &params)
 
 	const auto luminanceTableParamsProvided = params.contains("corner_strength") + params.contains("luminance_lut") + params.contains("luminance_lu_tables");
 	if (luminanceTableParamsProvided > 1) {
-		LOG(RPiAlsc, Warning) << "Number of luminance table parameters exceeds `1`.";
+		LOG(RPiAlsc, Error) << "Number of luminance table parameters exceeds 1.";
+		return -EINVAL;
 	}
 	else if (luminanceTableParamsProvided == 0) {
 		LOG(RPiAlsc, Warning) << "no luminance table - assume unity everywhere";
 	}
 
 	int ret = 0;
-	if (params.contains("corner_strength"))
+	if (params.contains("corner_strength")) {
 		ret = generateLut(config_.luminanceLut, params);
-	else if (params.contains("luminance_lut"))
+	}
+	else if (params.contains("luminance_lut")) {
 		ret = readLut(config_.luminanceLut, params["luminance_lut"]);
+	}
 	else if (params.contains("luminance_lu_tables")) {
 		for (const auto &p : params["luminance_lu_tables"].asList()) {
 			auto zoomLabel = p["zoom_label"].get<double>();
@@ -218,8 +221,14 @@ int Alsc::read(const libcamera::YamlObject &params)
 			<< "Only 1 luminance table provided.";
 		}
 		else {
-			LOG(RPiAlsc, Info) << "Read " << config_.luminanceLUTables.size() << " luminance tables.";
+			LOG(RPiAlsc, Debug) << "Read " << config_.luminanceLUTables.size() << " luminance tables.";
 		}
+	}
+
+	// TODO: below is the workaround for the case when legacy is used. Implement proper handling.
+	if (!params.contains("luminance_lu_tables")) {
+		LOG(RPiAlsc, Warning) << "Legacy is used.";
+		config_.luminanceLUTables.emplace_back(std::make_pair(-1.0, std::move(config_.luminanceLut)));
 	}
 
 	if (ret)
