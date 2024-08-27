@@ -166,6 +166,9 @@ int Alsc::read(const libcamera::YamlObject &params)
 	if (luminanceTableParamsProvided > 1) {
 		LOG(RPiAlsc, Warning) << "Number of luminance table parameters exceeds `1`.";
 	}
+	else if (luminanceTableParamsProvided == 0) {
+		LOG(RPiAlsc, Warning) << "no luminance table - assume unity everywhere";
+	}
 
 	int ret = 0;
 	if (params.contains("corner_strength"))
@@ -179,7 +182,7 @@ int Alsc::read(const libcamera::YamlObject &params)
 			luminanceTable.resize(config_.tableSize);
 			ret = readLut(luminanceTable, p["luminance_lut"]);
 			if (ret) { return ret; }
-			config_.luminanceLUTables.emplace_back((zoomLabel, luminanceTable));
+			config_.luminanceLUTables.emplace_back(std::make_pair(zoomLabel, std::move(luminanceTable)));
 		}
 
 		if (config_.luminanceLUTables.size() == 0) {
@@ -192,9 +195,7 @@ int Alsc::read(const libcamera::YamlObject &params)
 			<< "Only `1` luminance table provided.";
 		}
 	}
-	else 
-		LOG(RPiAlsc, Warning)
-			<< "no luminance table - assume unity everywhere";
+
 	if (ret)
 		return ret;
 
