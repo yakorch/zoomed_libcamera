@@ -26,6 +26,7 @@
 #include "controller/denoise_algorithm.h"
 #include "controller/hdr_algorithm.h"
 #include "controller/lux_algorithm.h"
+#include "controller/alsc_algorithm.h"
 #include "controller/lux_status.h"
 #include "controller/sharpen_algorithm.h"
 #include "controller/statistics.h"
@@ -725,6 +726,7 @@ void IpaBase::applyControls(const ControlList &controls)
 	using RPiController::DenoiseAlgorithm;
 	using RPiController::HdrAlgorithm;
 	using RPiController::LuxAlgorithm;
+	using RPiController::AlscAlgorithm;
 
 	/* Clear the return metadata buffer. */
 	libcameraMetadata_.clear();
@@ -1268,7 +1270,14 @@ void IpaBase::applyControls(const ControlList &controls)
 				LOG(IPARPI, Warning) << "Zoom label setting requires a Lux algorithm.";
 				break;
 			}
-			lux->setCurrentZoomLabel(static_cast<double>(zoomLabel));
+			lux->setZoomLabel(static_cast<double>(zoomLabel));
+
+			AlscAlgorithm *alsc = dynamic_cast<AlscAlgorithm *>(controller_.getAlgorithm("alsc"));
+			if (!alsc) {
+				LOG(IPARPI, Warning) << "Zoom label setting requires an ALSC algorithm.";
+				break;
+			}
+			alsc->setZoomLabel(static_cast<double>(zoomLabel));
 			break;
 		}
 
@@ -1286,7 +1295,7 @@ void IpaBase::applyControls(const ControlList &controls)
 				LOG(IPARPI, Error) << "Aperture setting requires a Lux algorithm.";
 				break;
 			}
-			lux->setCurrentAperture(static_cast<double>(aperture));
+			lux->setAperture(static_cast<double>(aperture));
 			break;
 		}
 

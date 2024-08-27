@@ -178,11 +178,19 @@ int Alsc::read(const libcamera::YamlObject &params)
 	else if (params.contains("luminance_lu_tables")) {
 		for (const auto &p : params["luminance_lu_tables"].asList()) {
 			auto zoomLabel = p["zoom_label"].get<double>();
+			if (!zoomLabel.has_value()) {
+				LOG(RPiAlsc, Error)
+				<< "No zoom label provided for luminance table.";
+				return -EINVAL;
+			}
 			Array2D<double> luminanceTable;
 			luminanceTable.resize(config_.tableSize);
 			ret = readLut(luminanceTable, p["luminance_lut"]);
-			if (ret) { return ret; }
-			config_.luminanceLUTables.emplace_back(std::make_pair(zoomLabel, std::move(luminanceTable)));
+			if (ret) {
+				LOG(RPiAlsc, Error) << "Failed to read luminance table.";
+				return ret;
+			}
+			config_.luminanceLUTables.emplace_back(std::make_pair(zoomLabel.value(), std::move(luminanceTable)));
 		}
 
 		if (config_.luminanceLUTables.size() == 0) {
@@ -190,9 +198,12 @@ int Alsc::read(const libcamera::YamlObject &params)
 			<< "No luminance tables provided.";
 			return -EINVAL;
 		}
-		if (config_.luminanceLUTables.size() == 1) {
+		else if (config_.luminanceLUTables.size() == 1) {
 			LOG(RPiAlsc, Warning)
-			<< "Only `1` luminance table provided.";
+			<< "Only 1 luminance table provided.";
+		}
+		else {
+			LOG(RPiAlsc, Info) << "Read " << config_.luminanceLUTables.size() << " luminance tables.";
 		}
 	}
 
@@ -267,6 +278,8 @@ void Alsc::setZoomLabel(double zoomLabel) {
 	zoomLabel_ = zoomLabel;
 }
 
+void Alsc::setAperture([[maybe_unused]] double aperture) {}
+
 double Alsc::getZoomLabel() {
 	std::lock_guard<std::mutex> lock(lensMutex_);
 	return zoomLabel_;
@@ -310,6 +323,11 @@ static bool compareModes(CameraMode const &cm0, CameraMode const &cm1)
 }
 
 void Alsc::computeLensAwareLuminanceTable(double requestedZoomLabel) {
+	if (config_.luminanceLUTables.empty()) {
+		LOG(RPiAlsc, Error) << "No luminance tables provided.";
+		return;
+	}
+
 	auto lowestZoomLabel = config_.luminanceLUTables.front().first;
 	auto largestZoomLabel = config_.luminanceLUTables.back().first;
 	requestedZoomLabel = std::min(std::max(lowestZoomLabel, requestedZoomLabel), largestZoomLabel);
@@ -447,7 +465,6 @@ void Alsc::restartAsync(StatisticsPtr &stats, Metadata *imageMetadata)
 	 */
 	copyStats(statistics_, stats, prevSyncResults_);
 	framePhase_ = 0;
-	syncedZoomLabel_ = zoomLabel_;
 	asyncStarted_ = true;
 	{
 		std::lock_guard<std::mutex> lock(mutex_);

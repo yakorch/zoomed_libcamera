@@ -120,7 +120,7 @@ public:
 	void setZoomLabel(double zoomLabel) override;
 	double getZoomLabel();
 	// TODO: implememt the function below.
-	void setAperture(double aperture) override {};
+	void setAperture([[maybe_unused]] double aperture) override;
 
 private:
 	/* configuration is read-only, and available to both threads */
