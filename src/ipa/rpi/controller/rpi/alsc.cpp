@@ -28,6 +28,21 @@ LOG_DEFINE_CATEGORY(RPiAlsc)
 
 static const double InsufficientData = -1.0;
 
+[[maybe_unused]] static void printCalTable(const Array2D<double> &C)
+{
+	const Size &size = C.dimensions();
+	printf("table: [\n");
+	for (unsigned int j = 0; j < size.height; j++) {
+		for (unsigned int i = 0; i < size.width; i++) {
+			printf("%5.3f", C[j * size.width + i]);
+			if (i != size.width - 1 || j != size.height - 1)
+				printf(",");
+		}
+		printf("\n");
+	}
+	printf("]\n");
+}
+
 Alsc::Alsc(Controller *controller)
 	: AlscAlgorithm(controller)
 {
@@ -339,11 +354,13 @@ void Alsc::computeLensAwareLuminanceTable(double requestedZoomLabel) {
 			return;
 		}
 
-		ind++;
-		if (requestedZoomLabel > zoomLabel) { continue; }
+		if (requestedZoomLabel > zoomLabel) {
+			ind++;
+			continue;
+		}
 
 		const auto &[previousZoomLabel, previousLuminanceTable] = config_.luminanceLUTables[ind];
-		auto previousScale = (requestedZoomLabel - previousZoomLabel) / (zoomLabel - previousZoomLabel);
+		auto previousScale = (zoomLabel - requestedZoomLabel) / (zoomLabel - previousZoomLabel);
 		auto nextScale = 1 - previousScale;
 		for (size_t i = 0; i < luminanceTable.size(); i++) {
 			lensAwareLuminanceTable_[i] = previousScale * previousLuminanceTable[i] + nextScale * luminanceTable[i];
@@ -685,20 +702,6 @@ void compensateLambdasForCal(const Array2D<double> &calTable,
 		newLambdas[i] /= minNewLambda;
 }
 
-[[maybe_unused]] static void printCalTable(const Array2D<double> &C)
-{
-	const Size &size = C.dimensions();
-	printf("table: [\n");
-	for (unsigned int j = 0; j < size.height; j++) {
-		for (unsigned int i = 0; i < size.width; i++) {
-			printf("%5.3f", 1.0 / C[j * size.width + i]);
-			if (i != size.width - 1 || j != size.height - 1)
-				printf(",");
-		}
-		printf("\n");
-	}
-	printf("]\n");
-}
 
 /*
  * Compute weight out of 1.0 which reflects how similar we wish to make the
