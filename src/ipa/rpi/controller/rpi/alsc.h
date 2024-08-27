@@ -118,6 +118,7 @@ public:
 	void process(StatisticsPtr &stats, Metadata *imageMetadata) override;
 	
 	void setZoomLabel(double zoomLabel) override;
+	double getZoomLabel();
 	// TODO: implememt the function below.
 	void setAperture(double aperture) override {};
 
@@ -155,6 +156,7 @@ private:
 	int frameCount2_;
 	/* up-to-date zoom label */
 	double zoomLabel_;
+	std::mutex lensMutex_;
 	/*
 	 * Tells if the new lens properties significantly 
 	 * differ from the ones used for previous computation
@@ -171,15 +173,13 @@ private:
 	/* copy out the results from the async thread so that it can be restarted */
 	void fetchAsyncResults();
 	double ct_;
-	/* the zoom label to be used for future computation */
-	double syncedZoomLabel_;
 	/* the zoom label for which the last computation of `lensAwareLuminanceTable_` was performed */
 	double cachedZoomLabel_;
 	/* Computes cameraMode-unaware calibration table */
 	void computeLensAwareLuminanceTable(double zoomLabel);
 	Array2D<double> lensAwareLuminanceTable_;
 	/* Modifies `luminanceTable_` given the camera mode and the lens parameters */
-	void computeLuminanceTable();
+	void recomputeLuminanceTableIfNeeded(double zoomLabel, bool forceFullRecompute);
 	RgbyRegions statistics_;
 	std::array<Array2D<double>, 3> asyncResults_;
 	Array2D<double> asyncLambdaR_;
